@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:/Users/ExtaziK/Documents/backtesting website\" && npx create-next-app@latest frontend --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --yes)",
+      "Bash(cd \"C:/Users/ExtaziK/Documents/backtesting website/frontend\" && npm install lightweight-charts axios)",
+      "Bash(pip index:*)",
+      "Bash(cd \"C:\\\\Users\\\\ExtaziK\\\\Documents\\\\backtesting website\" && docker-compose up --build 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\ExtaziK\\\\Documents\\\\backtesting website\" && docker-compose up --build 2>&1 | tail -50)",
+      "Bash(cd \"C:\\\\Users\\\\ExtaziK\\\\Documents\\\\backtesting website\" && docker-compose up --build 2>&1 | tail -30)",
+      "Bash(cd \"C:\\\\Users\\\\ExtaziK\\\\Documents\\\\backtesting website\" && docker-compose up --build 2>&1 | tail -40)"
+    ]
+  }
+}

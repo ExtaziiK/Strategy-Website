@@ -1,0 +1,20 @@
+- [x] Project Planning & Setup
+  - [x] Agree on architecture & choose Supabase for Database
+  - [x] Initialize frontend and backend directories
+- [x] Backend Implementation
+  - [x] Set up FastAPI and Supabase integration
+  - [x] Implement historical data fetcher (Binance API)
+  - [x] Implement Backtesting Engine (Pandas, Support for Indicators: EMA, RSI, MACD)
+  - [x] Implement Strategy Filters
+  - [x] Create REST API Endpoints
+- [x] Frontend Implementation
+  - [x] Initialize Next.js project with TailwindCSS
+  - [x] Create Strategy Builder UI (No-Code form: Rules & Filters)
+  - [x] Implement Backtesting Dashboard & Results Metrics
+  - [x] Integrate TradingView Lightweight Charts (Candles & Overlays)
+- [x] Integration
+  - [x] Connect Frontend to Backend API
+  - [ ] End-to-end testing with example strategies
+- [x] Deployment & Documentation
+  - [x] Prepare Docker Compose setup
+  - [ ] Write README.md
