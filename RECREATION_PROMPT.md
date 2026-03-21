@@ -4,7 +4,7 @@ Build a full-stack BTC trading strategy backtesting web application with the fol
 
 ---
 
-## Tech Stack
+## Tech Stacks
 
 **Backend:** Python 3.11+ with FastAPI, Uvicorn, Pandas, NumPy, `ta` (technical analysis library), CCXT (for fetching Binance data), Supabase Python client, Pydantic Settings, python-dotenv, pytest, httpx.
 
