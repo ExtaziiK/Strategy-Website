@@ -46,7 +46,7 @@ export default function StrategyCard({ strategy, onDelete }: Props) {
           </div>
           <div>
             <p className="text-xs text-gray-500">Win Rate</p>
-            <p className="text-sm font-semibold text-white">{(r.win_rate * 100).toFixed(1)}%</p>
+            <p className="text-sm font-semibold text-white">{r.win_rate.toFixed(1)}%</p>
           </div>
           <div>
             <p className="text-xs text-gray-500">Total Trades</p>

@@ -68,31 +68,22 @@ def run_backtest_endpoint(request: BacktestRequest):
         }
         db.table("backtest_results").insert(save_record).execute()
         result.id = save_record["id"]
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Warning: Failed to save backtest result to database: {e}", flush=True)
 
-    # Build candle data for frontend chart
-    candles = []
-    for _, row in df.iterrows():
-        candles.append({
-            "timestamp": str(row["timestamp"]),
-            "open": float(row["open"]),
-            "high": float(row["high"]),
-            "low": float(row["low"]),
-            "close": float(row["close"]),
-            "volume": float(row["volume"]),
-        })
+    # Build candle data for frontend chart (vectorized)
+    candle_df = df[["timestamp", "open", "high", "low", "close", "volume"]].copy()
+    candle_df["timestamp"] = candle_df["timestamp"].astype(str)
+    candles = candle_df.to_dict(orient="records")
 
-    # Build indicator data for overlays
+    # Build indicator data for overlays (vectorized)
     indicator_data = {}
     for col in df.columns:
         if col.startswith("ema_") or col.startswith("rsi_") or col in ("macd", "macd_signal", "macd_hist"):
-            values = []
-            for _, row in df.iterrows():
-                val = row[col]
-                if not (val != val):  # check NaN
-                    values.append({"timestamp": str(row["timestamp"]), "value": round(float(val), 2)})
-            indicator_data[col] = values
+            col_df = df[["timestamp", col]].dropna(subset=[col]).copy()
+            col_df["timestamp"] = col_df["timestamp"].astype(str)
+            col_df[col] = col_df[col].round(2)
+            indicator_data[col] = col_df.rename(columns={col: "value"}).to_dict(orient="records")
 
     return {
         "result": result.model_dump(),

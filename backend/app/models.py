@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -20,6 +20,29 @@ class StrategyConfig(BaseModel):
     exchange: str = "binance"       # "binance", "kraken", "hyperliquid"
     position_size_pct: float = 100.0  # % of available balance to use per trade (1-100)
     lookback_days: int = 365           # how many days of history to backtest
+
+    @field_validator("initial_balance")
+    @classmethod
+    def validate_balance(cls, v: float) -> float:
+        if v < 1:
+            raise ValueError("initial_balance must be at least 1")
+        return v
+
+    @field_validator("position_size_pct")
+    @classmethod
+    def validate_position_size(cls, v: float) -> float:
+        if not 1 <= v <= 100:
+            raise ValueError("position_size_pct must be between 1 and 100")
+        return v
+
+    @field_validator("lookback_days")
+    @classmethod
+    def validate_lookback(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("lookback_days must be at least 1")
+        if v > 3650:
+            raise ValueError("lookback_days cannot exceed 3650 (10 years)")
+        return v
 
 
 class StrategyCreate(BaseModel):

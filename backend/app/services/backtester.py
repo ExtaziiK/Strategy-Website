@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from dataclasses import dataclass
 from app.models import StrategyConfig, TradeRecord, EquityPoint, BacktestResultResponse
 
 
@@ -9,6 +10,13 @@ EXCHANGE_FEES = {
     "kraken":       0.0026,   # 0.26%
     "hyperliquid":  0.00035,  # 0.035%
 }
+
+
+@dataclass
+class Position:
+    entry_price: float
+    entry_date: str
+    qty: float
 
 
 def get_indicator_value(row, indicator: str, params: dict) -> float:
@@ -231,7 +239,7 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
     position_size_pct = getattr(config, "position_size_pct", 100.0) or 100.0
 
     balance = config.initial_balance
-    position = None
+    position: Position | None = None
     trades: list[TradeRecord] = []
     equity_curve: list[EquityPoint] = []
     total_fees = 0.0
@@ -251,7 +259,7 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
         price = float(row["close"])
 
         # Equity = cash balance + current value of open position
-        current_equity = balance + (position["qty"] * price if position else 0.0)
+        current_equity = balance + (position.qty * price if position else 0.0)
 
         # Only record equity curve from the first trade onward
         if first_trade_ts is not None:
@@ -284,11 +292,11 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
                 total_fees += fee
                 invested = allocated - fee
                 qty = invested / exec_price
-                position = {
-                    "entry_price": exec_price,
-                    "entry_date": timestamp,
-                    "qty": qty,
-                }
+                position = Position(
+                    entry_price=exec_price,
+                    entry_date=timestamp,
+                    qty=qty,
+                )
                 balance -= allocated
                 if first_trade_ts is None:
                     first_trade_ts = timestamp
@@ -300,20 +308,20 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
                     sell_triggered, sell_states = evaluate_rules_stateful(row, config.sell_rules, sell_states)
                     if sell_triggered:
                         sell_exec = get_execution_price(row, config.sell_rules, price)
-                        gross = position["qty"] * sell_exec
+                        gross = position.qty * sell_exec
                         sell_fee = gross * fee_rate
                         total_fees += sell_fee
                         proceeds = gross - sell_fee
                         balance += proceeds
 
-                        entry_cost = position["entry_price"] * position["qty"]
+                        entry_cost = position.entry_price * position.qty
                         pnl = proceeds - entry_cost * (1 + fee_rate)
-                        pnl_pct = ((sell_exec / position["entry_price"]) - 1) * 100 - (fee_rate * 2 * 100)
+                        pnl_pct = ((sell_exec / position.entry_price) - 1) * 100 - (fee_rate * 2 * 100)
 
                         trades.append(TradeRecord(
-                            entry_date=position["entry_date"],
+                            entry_date=position.entry_date,
                             exit_date=timestamp,
-                            entry_price=round(position["entry_price"], 2),
+                            entry_price=round(position.entry_price, 2),
                             exit_price=round(sell_exec, 2),
                             pnl=round(pnl, 2),
                             pnl_pct=round(pnl_pct, 2),
@@ -329,20 +337,20 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
             sell_triggered, sell_states = evaluate_rules_stateful(row, config.sell_rules, sell_states)
             if sell_triggered:
                 exec_price = get_execution_price(row, config.sell_rules, price)
-                gross = position["qty"] * exec_price
+                gross = position.qty * exec_price
                 fee = gross * fee_rate
                 total_fees += fee
                 proceeds = gross - fee
                 balance += proceeds
 
-                entry_cost = position["entry_price"] * position["qty"]
+                entry_cost = position.entry_price * position.qty
                 pnl = proceeds - entry_cost * (1 + fee_rate)
-                pnl_pct = ((exec_price / position["entry_price"]) - 1) * 100 - (fee_rate * 2 * 100)
+                pnl_pct = ((exec_price / position.entry_price) - 1) * 100 - (fee_rate * 2 * 100)
 
                 trades.append(TradeRecord(
-                    entry_date=position["entry_date"],
+                    entry_date=position.entry_date,
                     exit_date=timestamp,
-                    entry_price=round(position["entry_price"], 2),
+                    entry_price=round(position.entry_price, 2),
                     exit_price=round(exec_price, 2),
                     pnl=round(pnl, 2),
                     pnl_pct=round(pnl_pct, 2),
@@ -360,11 +368,11 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
                         total_fees += buy_fee
                         invested = allocated - buy_fee
                         qty = invested / buy_exec
-                        position = {
-                            "entry_price": buy_exec,
-                            "entry_date": timestamp,
-                            "qty": qty,
-                        }
+                        position = Position(
+                            entry_price=buy_exec,
+                            entry_date=timestamp,
+                            qty=qty,
+                        )
                         balance -= allocated
                         sell_states = seed_states_after_buy(config.sell_rules)
                 else:
@@ -375,20 +383,20 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
     if position is not None:
         last_row = df.iloc[-1]
         price = float(last_row["close"])
-        gross = position["qty"] * price
+        gross = position.qty * price
         fee = gross * fee_rate
         total_fees += fee
         proceeds = gross - fee
         balance += proceeds
 
-        entry_cost = position["entry_price"] * position["qty"]
+        entry_cost = position.entry_price * position.qty
         pnl = proceeds - entry_cost * (1 + fee_rate)
-        pnl_pct = ((price / position["entry_price"]) - 1) * 100 - (fee_rate * 2 * 100)
+        pnl_pct = ((price / position.entry_price) - 1) * 100 - (fee_rate * 2 * 100)
 
         trades.append(TradeRecord(
-            entry_date=position["entry_date"],
+            entry_date=position.entry_date,
             exit_date=str(last_row["timestamp"]),
-            entry_price=round(position["entry_price"], 2),
+            entry_price=round(position.entry_price, 2),
             exit_price=round(price, 2),
             pnl=round(pnl, 2),
             pnl_pct=round(pnl_pct, 2),

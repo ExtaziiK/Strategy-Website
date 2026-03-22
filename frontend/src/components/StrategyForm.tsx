@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { StrategyConfig, StrategyRule, TIMEFRAMES, EXCHANGES, LOOKBACK_OPTIONS, emptyRule, emptyConfig } from "@/lib/types";
 import RuleRow from "./RuleRow";
 
@@ -24,6 +24,22 @@ export default function StrategyForm({
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Stable keys for each rule to avoid React index-as-key bugs
+  const nextKey = useRef(0);
+  const makeKey = () => String(nextKey.current++);
+  const [ruleKeys, setRuleKeys] = useState<{
+    buy_rules: string[];
+    sell_rules: string[];
+    filters: string[];
+  }>(() => {
+    const cfg = initialConfig || emptyConfig();
+    return {
+      buy_rules: cfg.buy_rules.map(() => makeKey()),
+      sell_rules: cfg.sell_rules.map(() => makeKey()),
+      filters: cfg.filters.map(() => makeKey()),
+    };
+  });
+
   const updateRules = (
     section: "buy_rules" | "sell_rules" | "filters",
     index: number,
@@ -36,11 +52,13 @@ export default function StrategyForm({
 
   const addRule = (section: "buy_rules" | "sell_rules" | "filters") => {
     setConfig({ ...config, [section]: [...config[section], emptyRule()] });
+    setRuleKeys(prev => ({ ...prev, [section]: [...prev[section], makeKey()] }));
   };
 
   const removeRule = (section: "buy_rules" | "sell_rules" | "filters", index: number) => {
     const updated = config[section].filter((_, i) => i !== index);
     setConfig({ ...config, [section]: updated });
+    setRuleKeys(prev => ({ ...prev, [section]: prev[section].filter((_, i) => i !== index) }));
   };
 
   const handleSubmit = async () => {
@@ -92,7 +110,7 @@ export default function StrategyForm({
       )}
       {config[section].map((rule, i) => (
         <RuleRow
-          key={i}
+          key={ruleKeys[section][i]}
           rule={rule}
           onChange={(r) => updateRules(section, i, r)}
           onRemove={() => removeRule(section, i)}
