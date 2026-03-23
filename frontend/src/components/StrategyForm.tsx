@@ -23,6 +23,7 @@ export default function StrategyForm({
   const [loading, setLoading] = useState(false);
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
 
   // Stable keys for each rule to avoid React index-as-key bugs
   const nextKey = useRef(0);
@@ -83,8 +84,12 @@ export default function StrategyForm({
     if (config.buy_rules.length === 0) return alert("Add at least one buy rule");
     if (config.sell_rules.length === 0) return alert("Add at least one sell rule");
     setBacktestLoading(true);
+    setBacktestError(null);
     try {
       await onRunBacktest(name || "Unnamed Strategy", config);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setBacktestError(msg);
     } finally {
       setBacktestLoading(false);
     }
@@ -241,6 +246,9 @@ export default function StrategyForm({
           </button>
         )}
       </div>
+      {backtestError && (
+        <p className="text-red-400 text-sm mt-2">Backtest failed: {backtestError}</p>
+      )}
     </div>
   );
 }
