@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { Strategy } from "@/lib/types";
 
@@ -9,6 +10,7 @@ interface Props {
 
 export default function StrategyCard({ strategy, onDelete }: Props) {
   const r = strategy.last_result;
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
@@ -80,12 +82,30 @@ export default function StrategyCard({ strategy, onDelete }: Props) {
         >
           Edit
         </Link>
-        <button
-          onClick={() => onDelete(strategy.id)}
-          className="rounded bg-red-900/50 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-900 transition"
-        >
-          Delete
-        </button>
+        {confirmDelete ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-400">Delete?</span>
+            <button
+              onClick={() => onDelete(strategy.id)}
+              className="rounded bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 transition"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="rounded bg-gray-700 px-3 py-2 text-sm font-medium text-white hover:bg-gray-600 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="rounded bg-red-900/50 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-900 transition"
+          >
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );
