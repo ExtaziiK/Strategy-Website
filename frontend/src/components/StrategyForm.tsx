@@ -218,6 +218,58 @@ export default function StrategyForm({
         {renderSection("Strategy Filters", "filters", "text-yellow-400")}
       </div>
 
+      {/* Trailing Stop */}
+      <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.trailing_stop_atr !== null}
+              onChange={(e) =>
+                setConfig({
+                  ...config,
+                  trailing_stop_atr: e.target.checked ? 2.0 : null,
+                })
+              }
+              className="rounded border-gray-700 bg-gray-800 text-orange-500 focus:ring-orange-500"
+            />
+            <span className="text-lg font-semibold text-orange-400">Trailing Stop (ATR)</span>
+          </label>
+        </div>
+        {config.trailing_stop_atr !== null && (
+          <div className="flex items-center gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">ATR Multiplier</label>
+              <input
+                type="number"
+                value={config.trailing_stop_atr}
+                onChange={(e) =>
+                  setConfig({ ...config, trailing_stop_atr: Number(e.target.value) })
+                }
+                className="w-28 rounded bg-gray-800 border border-gray-700 px-3 py-2 text-white text-sm"
+                min={0.1}
+                step={0.1}
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">ATR Period</label>
+              <input
+                type="number"
+                value={config.trailing_stop_atr_period}
+                onChange={(e) =>
+                  setConfig({ ...config, trailing_stop_atr_period: Number(e.target.value) })
+                }
+                className="w-28 rounded bg-gray-800 border border-gray-700 px-3 py-2 text-white text-sm"
+                min={1}
+              />
+            </div>
+            <p className="text-sm text-gray-500 self-end pb-2">
+              Exit when price drops below highest price - {config.trailing_stop_atr} x ATR({config.trailing_stop_atr_period})
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Save error */}
       {error && (
         <div className="rounded-lg border border-red-800 bg-red-900/20 p-4 text-red-400 text-sm">

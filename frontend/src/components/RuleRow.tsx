@@ -8,7 +8,7 @@ interface Props {
   onRemove: () => void;
 }
 
-const NEEDS_PERIOD = ["ema", "rsi"];
+const NEEDS_PERIOD = ["ema", "rsi", "atr"];
 const CROSS_COMPARATORS = ["crosses_above", "crosses_below"];
 const PRESET_REFS = ["ema_10", "ema_20", "ema_50", "ema_100", "ema_200", "price"];
 

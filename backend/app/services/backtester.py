@@ -17,6 +17,7 @@ class Position:
     entry_price: float
     entry_date: str
     qty: float
+    highest_price: float = 0.0  # high watermark for trailing stop
 
 
 def get_indicator_value(row, indicator: str, params: dict) -> float:
@@ -36,6 +37,9 @@ def get_indicator_value(row, indicator: str, params: dict) -> float:
         return float(row["macd_signal"])
     elif indicator == "macd_hist":
         return float(row["macd_hist"])
+    elif indicator == "atr":
+        period = int(params.get("period", 14))
+        return float(row[f"atr_{period}"])
     return 0.0
 
 
@@ -48,6 +52,8 @@ def get_comparison_value(row, value) -> float:
         if val.startswith("ema_"):
             return float(row[val])
         elif val.startswith("rsi_"):
+            return float(row[val])
+        elif val.startswith("atr_"):
             return float(row[val])
         elif val in ("macd", "macd_signal", "macd_hist"):
             return float(row[val])
@@ -296,6 +302,7 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
                     entry_price=exec_price,
                     entry_date=timestamp,
                     qty=qty,
+                    highest_price=float(row["high"]),
                 )
                 balance -= allocated
                 if first_trade_ts is None:
@@ -325,6 +332,7 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
                             exit_price=round(sell_exec, 2),
                             pnl=round(pnl, 2),
                             pnl_pct=round(pnl_pct, 2),
+                            exit_reason="sell_rule",
                         ))
                         position = None
                         buy_states = seed_states_after_sell(config.buy_rules)
@@ -332,11 +340,39 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
                     # Bullish: LOW came first, HIGH came after buy — seed sell for next candle
                     sell_states = seed_states_after_buy(config.sell_rules)
 
-        # If in position, check sell rules
+        # If in position, check trailing stop and sell rules
         elif position is not None:
+            # Update trailing stop high watermark
+            position.highest_price = max(position.highest_price, float(row["high"]))
+
+            # Check trailing stop
+            trailing_stop_hit = False
+            trailing_stop_price = None
+            if config.trailing_stop_atr:
+                atr_col = f"atr_{config.trailing_stop_atr_period}"
+                atr_val = row.get(atr_col)
+                if atr_val is not None and not pd.isna(atr_val):
+                    stop_level = position.highest_price - config.trailing_stop_atr * float(atr_val)
+                    if float(row["low"]) <= stop_level:
+                        trailing_stop_hit = True
+                        open_price = float(row["open"])
+                        trailing_stop_price = open_price if open_price <= stop_level else stop_level
+
             sell_triggered, sell_states = evaluate_rules_stateful(row, config.sell_rules, sell_states)
-            if sell_triggered:
-                exec_price = get_execution_price(row, config.sell_rules, price)
+
+            if trailing_stop_hit or sell_triggered:
+                # Determine exit price and reason
+                if trailing_stop_hit and sell_triggered:
+                    rule_exec = get_execution_price(row, config.sell_rules, price)
+                    exec_price = min(trailing_stop_price, rule_exec)
+                    exit_reason = "trailing_stop" if exec_price == trailing_stop_price else "sell_rule"
+                elif trailing_stop_hit:
+                    exec_price = trailing_stop_price
+                    exit_reason = "trailing_stop"
+                else:
+                    exec_price = get_execution_price(row, config.sell_rules, price)
+                    exit_reason = "sell_rule"
+
                 gross = position.qty * exec_price
                 fee = gross * fee_rate
                 total_fees += fee
@@ -354,6 +390,7 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
                     exit_price=round(exec_price, 2),
                     pnl=round(pnl, 2),
                     pnl_pct=round(pnl_pct, 2),
+                    exit_reason=exit_reason,
                 ))
                 position = None
 
@@ -372,6 +409,7 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
                             entry_price=buy_exec,
                             entry_date=timestamp,
                             qty=qty,
+                            highest_price=float(row["high"]),
                         )
                         balance -= allocated
                         sell_states = seed_states_after_buy(config.sell_rules)
@@ -400,6 +438,7 @@ def run_backtest(df: pd.DataFrame, config: StrategyConfig) -> BacktestResultResp
             exit_price=round(price, 2),
             pnl=round(pnl, 2),
             pnl_pct=round(pnl_pct, 2),
+            exit_reason="end_of_data",
         ))
         position = None
 

@@ -16,6 +16,15 @@ def add_rsi(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
     return df
 
 
+def add_atr(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
+    """Add ATR column to DataFrame."""
+    col = f"atr_{period}"
+    df[col] = ta.volatility.AverageTrueRange(
+        high=df["high"], low=df["low"], close=df["close"], window=period
+    ).average_true_range()
+    return df
+
+
 def add_macd(df: pd.DataFrame) -> pd.DataFrame:
     """Add MACD, MACD signal, and MACD histogram columns."""
     macd_indicator = ta.trend.MACD(close=df["close"])
@@ -47,6 +56,13 @@ def compute_indicators(df: pd.DataFrame, rules: list) -> pd.DataFrame:
                 df = add_rsi(df, period)
                 indicators_added.add(key)
 
+        elif indicator == "atr":
+            period = int(params.get("period", 14))
+            key = f"atr_{period}"
+            if key not in indicators_added:
+                df = add_atr(df, period)
+                indicators_added.add(key)
+
         elif indicator in ("macd", "macd_signal", "macd_hist"):
             if "macd" not in indicators_added:
                 df = add_macd(df)
@@ -66,6 +82,12 @@ def compute_indicators(df: pd.DataFrame, rules: list) -> pd.DataFrame:
                 key = f"rsi_{period}"
                 if key not in indicators_added:
                     df = add_rsi(df, period)
+                    indicators_added.add(key)
+            elif val.startswith("atr_"):
+                period = int(val.split("_")[1])
+                key = f"atr_{period}"
+                if key not in indicators_added:
+                    df = add_atr(df, period)
                     indicators_added.add(key)
             elif val in ("macd", "macd_signal", "macd_hist"):
                 if "macd" not in indicators_added:

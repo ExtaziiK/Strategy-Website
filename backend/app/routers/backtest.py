@@ -44,6 +44,13 @@ def run_backtest_endpoint(request: BacktestRequest):
     all_rules = config.buy_rules + config.sell_rules + config.filters
     df = compute_indicators(df, all_rules)
 
+    # Ensure ATR is computed when trailing stop is enabled
+    if config.trailing_stop_atr:
+        atr_col = f"atr_{config.trailing_stop_atr_period}"
+        if atr_col not in df.columns:
+            from app.services.indicators import add_atr
+            df = add_atr(df, config.trailing_stop_atr_period)
+
     # Run backtest
     result = run_backtest(df, config)
 
@@ -79,7 +86,7 @@ def run_backtest_endpoint(request: BacktestRequest):
     # Build indicator data for overlays (vectorized)
     indicator_data = {}
     for col in df.columns:
-        if col.startswith("ema_") or col.startswith("rsi_") or col in ("macd", "macd_signal", "macd_hist"):
+        if col.startswith("ema_") or col.startswith("rsi_") or col.startswith("atr_") or col in ("macd", "macd_signal", "macd_hist"):
             col_df = df[["timestamp", col]].dropna(subset=[col]).copy()
             col_df["timestamp"] = col_df["timestamp"].astype(str)
             col_df[col] = col_df[col].round(2)

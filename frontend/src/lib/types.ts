@@ -15,6 +15,8 @@ export interface StrategyConfig {
   exchange: string;
   position_size_pct: number;
   lookback_days: number;
+  trailing_stop_atr: number | null;
+  trailing_stop_atr_period: number;
 }
 
 export interface StrategyLastResult {
@@ -41,6 +43,7 @@ export interface TradeRecord {
   exit_price: number;
   pnl: number;
   pnl_pct: number;
+  exit_reason?: string;
 }
 
 export interface EquityPoint {
@@ -80,7 +83,7 @@ export interface BacktestResponse {
   indicators: IndicatorData;
 }
 
-export const INDICATORS = ["price", "ema", "rsi", "macd", "macd_signal", "macd_hist"] as const;
+export const INDICATORS = ["price", "ema", "rsi", "atr", "macd", "macd_signal", "macd_hist"] as const;
 export const COMPARATORS = [">", "<", "crosses_above", "crosses_below"] as const;
 export const TIMEFRAMES = ["1h", "4h", "1d", "1w"] as const;
 export const EXCHANGES = [
@@ -115,5 +118,7 @@ export function emptyConfig(): StrategyConfig {
     exchange: "binance",
     position_size_pct: 100,
     lookback_days: 365,
+    trailing_stop_atr: null,
+    trailing_stop_atr_period: 14,
   };
 }

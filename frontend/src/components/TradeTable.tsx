@@ -35,6 +35,7 @@ export default function TradeTable({ trades }: Props) {
             <th className="px-4 py-3 text-right">Exit Price</th>
             <th className="px-4 py-3 text-right">P&L</th>
             <th className="px-4 py-3 text-right">P&L %</th>
+            <th className="px-4 py-3">Exit Reason</th>
           </tr>
         </thead>
         <tbody>
@@ -71,6 +72,17 @@ export default function TradeTable({ trades }: Props) {
                 </td>
                 <td className={`px-4 py-3 text-right font-medium ${trade.pnl_pct >= 0 ? "text-green-400" : "text-red-400"}`}>
                   {trade.pnl_pct >= 0 ? "+" : ""}{trade.pnl_pct.toFixed(2)}%
+                </td>
+                <td className="px-4 py-3 text-gray-400 text-xs">
+                  {trade.exit_reason === "trailing_stop" ? (
+                    <span className="text-orange-400">Trailing Stop</span>
+                  ) : trade.exit_reason === "end_of_data" ? (
+                    <span className="text-gray-500">End of Data</span>
+                  ) : trade.exit_reason === "sell_rule" ? (
+                    "Sell Rule"
+                  ) : (
+                    ""
+                  )}
                 </td>
               </tr>
             );

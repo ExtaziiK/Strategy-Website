@@ -20,6 +20,8 @@ class StrategyConfig(BaseModel):
     exchange: str = "binance"       # "binance", "kraken", "hyperliquid"
     position_size_pct: float = 100.0  # % of available balance to use per trade (1-100)
     lookback_days: int = 365           # how many days of history to backtest
+    trailing_stop_atr: Optional[float] = None  # ATR multiplier for trailing stop (e.g. 2.0)
+    trailing_stop_atr_period: int = 14          # ATR period for trailing stop
 
     @field_validator("initial_balance")
     @classmethod
@@ -74,6 +76,7 @@ class TradeRecord(BaseModel):
     exit_price: float
     pnl: float
     pnl_pct: float
+    exit_reason: Optional[str] = None  # "sell_rule", "trailing_stop", "end_of_data"
 
 
 class EquityPoint(BaseModel):
