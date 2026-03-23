@@ -108,10 +108,10 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       const buyMarkers = trades
         .map((t) => ({
           time: toTimestamp(t.entry_date) as any,
-          position: "inBar" as const,
-          color: "#22c55e",
-          shape: "arrowUp" as const,
-          text: `Buy $${Math.round(t.entry_price).toLocaleString()}`,
+          position: "belowBar" as const,
+          color: "#06b6d4",
+          shape: "circle" as const,
+          text: `$${Math.round(t.entry_price).toLocaleString("en-US")}`,
         }))
         .sort((a, b) => a.time - b.time);
       createSeriesMarkers(buySeries, buyMarkers);
@@ -129,10 +129,10 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       const sellMarkers = trades
         .map((t) => ({
           time: toTimestamp(t.exit_date) as any,
-          position: "inBar" as const,
-          color: "#ef4444",
-          shape: "arrowDown" as const,
-          text: `Sell $${Math.round(t.exit_price).toLocaleString()}`,
+          position: "aboveBar" as const,
+          color: "#f97316",
+          shape: "circle" as const,
+          text: `$${Math.round(t.exit_price).toLocaleString("en-US")}`,
         }))
         .sort((a, b) => a.time - b.time);
       createSeriesMarkers(sellSeries, sellMarkers);
