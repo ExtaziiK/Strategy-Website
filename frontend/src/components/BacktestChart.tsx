@@ -39,8 +39,6 @@ function toTimestamp(dateStr: string): number {
 
 export default function BacktestChart({ candles, indicators, trades }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const rsiContainerRef = useRef<HTMLDivElement>(null);
-  const macdContainerRef = useRef<HTMLDivElement>(null);
   const seriesRefs = useRef<Map<string, any>>(new Map());
   const [hiddenIndicators, setHiddenIndicators] = useState<Set<string>>(new Set());
 
@@ -58,7 +56,7 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
     });
   };
 
-  // ── Main chart + oscillator panels ──────────────────────────────────────────
+  // ── Main chart + oscillator panes ─────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || candles.length === 0) return;
 
@@ -69,6 +67,15 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
     const hasMacdLocal = "macd" in indicators;
     const hasRsiLocal = rsiKeysLocal.length > 0;
 
+    // Count panes: main (0) + RSI (1?) + MACD (1?)
+    const paneCount = 1 + (hasRsiLocal ? 1 : 0) + (hasMacdLocal ? 1 : 0);
+    const rsiPane = hasRsiLocal ? 1 : -1;
+    const macdPane = hasMacdLocal ? (hasRsiLocal ? 2 : 1) : -1;
+
+    // Adjust chart height: main 500 + sub-panels
+    const subPanelHeight = 150;
+    const totalHeight = 500 + (paneCount - 1) * subPanelHeight;
+
     // Collect trade timestamps for vertical lines
     const buyTimestamps = new Set<number>();
     const sellTimestamps = new Set<number>();
@@ -77,14 +84,15 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       sellTimestamps.add(toTimestamp(t.exit_date));
     }
 
-    // ── Main price chart ────────────────────────────────────────────────────
+    // ── Create single chart ──────────────────────────────────────────────────
     const chart = createChart(containerRef.current, {
       ...CHART_THEME,
       width: containerRef.current.clientWidth,
-      height: 500,
+      height: totalHeight,
       timeScale: { timeVisible: true, secondsVisible: false },
     });
 
+    // ── Pane 0: Main price chart ─────────────────────────────────────────────
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#22c55e",
       downColor: "#ef4444",
@@ -100,7 +108,7 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       }))
     );
 
-    // EMA overlays
+    // EMA overlays (pane 0)
     for (const [key, values] of Object.entries(indicators)) {
       if (key.startsWith("ema_")) {
         const lineSeries = chart.addSeries(LineSeries, {
@@ -157,7 +165,6 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       );
 
       // ── Vertical trade lines on main chart ──
-      // Buy lines (cyan, dashed)
       const buyLineSeries = chart.addSeries(HistogramSeries, {
         color: "#06b6d440",
         priceFormat: { type: "volume" },
@@ -181,7 +188,6 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
         }))
       );
 
-      // Sell lines (orange, dashed)
       const sellLineSeries = chart.addSeries(HistogramSeries, {
         color: "#f9731640",
         priceFormat: { type: "volume" },
@@ -197,24 +203,14 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       );
     }
 
-    chart.timeScale().fitContent();
-
-    // ── RSI sub-panel ───────────────────────────────────────────────────────
-    let rsiChart: IChartApi | null = null;
-    if (hasRsiLocal && rsiContainerRef.current) {
-      rsiChart = createChart(rsiContainerRef.current, {
-        ...CHART_THEME,
-        width: rsiContainerRef.current.clientWidth,
-        height: 150,
-        timeScale: { visible: false },
-        rightPriceScale: { scaleMargins: { top: 0.1, bottom: 0.1 } },
-      });
-
+    // ── RSI pane ─────────────────────────────────────────────────────────────
+    if (hasRsiLocal && rsiPane > 0) {
       for (const key of rsiKeysLocal) {
-        const rsiSeries = rsiChart.addSeries(LineSeries, {
+        const rsiSeries = chart.addSeries(LineSeries, {
           color: "#a78bfa",
           lineWidth: 1,
-        });
+          title: key.replace("_", " ").toUpperCase(),
+        }, rsiPane);
         rsiSeries.setData(
           indicators[key].map((v) => ({ time: toTimestamp(v.timestamp) as any, value: v.value }))
         );
@@ -232,20 +228,19 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
         });
       }
 
-      // ── Vertical trade lines on RSI chart ──
+      // Vertical trade lines on RSI pane
       if (trades.length > 0) {
         const rsiData = rsiKeysLocal.length > 0
           ? indicators[rsiKeysLocal[0]].map((v) => toTimestamp(v.timestamp))
           : [];
-        const rsiTimeSet = new Set(rsiData);
 
-        const rsiLinesBuy = rsiChart.addSeries(HistogramSeries, {
+        const rsiLinesBuy = chart.addSeries(HistogramSeries, {
           color: "#06b6d440",
           priceFormat: { type: "volume" },
           priceScaleId: "rsi-trade-lines",
           lastValueVisible: false,
-        });
-        rsiChart.priceScale("rsi-trade-lines").applyOptions({ visible: false });
+        }, rsiPane);
+        chart.priceScale("rsi-trade-lines", rsiPane).applyOptions({ visible: false });
 
         rsiLinesBuy.setData(
           rsiData.map((time) => ({
@@ -255,12 +250,12 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
           }))
         );
 
-        const rsiLinesSell = rsiChart.addSeries(HistogramSeries, {
+        const rsiLinesSell = chart.addSeries(HistogramSeries, {
           color: "#f9731640",
           priceFormat: { type: "volume" },
           priceScaleId: "rsi-trade-lines",
           lastValueVisible: false,
-        });
+        }, rsiPane);
         rsiLinesSell.setData(
           rsiData.map((time) => ({
             time: time as any,
@@ -271,21 +266,13 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       }
     }
 
-    // ── MACD sub-panel ──────────────────────────────────────────────────────
-    let macdChart: IChartApi | null = null;
-    if (hasMacdLocal && macdContainerRef.current) {
-      macdChart = createChart(macdContainerRef.current, {
-        ...CHART_THEME,
-        width: macdContainerRef.current.clientWidth,
-        height: 150,
-        timeScale: { visible: false },
-      });
-
+    // ── MACD pane ────────────────────────────────────────────────────────────
+    if (hasMacdLocal && macdPane > 0) {
       if (indicators["macd_hist"]) {
-        const histSeries = macdChart.addSeries(HistogramSeries, {
+        const histSeries = chart.addSeries(HistogramSeries, {
           color: "#22c55e",
           priceFormat: { type: "price", precision: 2, minMove: 0.01 },
-        });
+        }, macdPane);
         histSeries.setData(
           indicators["macd_hist"].map((v) => ({
             time: toTimestamp(v.timestamp) as any,
@@ -296,33 +283,37 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       }
 
       if (indicators["macd"]) {
-        const macdLine = macdChart.addSeries(LineSeries, { color: "#3b82f6", lineWidth: 1 });
+        const macdLine = chart.addSeries(LineSeries, {
+          color: "#3b82f6", lineWidth: 1, title: "MACD",
+        }, macdPane);
         macdLine.setData(
           indicators["macd"].map((v) => ({ time: toTimestamp(v.timestamp) as any, value: v.value }))
         );
       }
 
       if (indicators["macd_signal"]) {
-        const signalLine = macdChart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1 });
+        const signalLine = chart.addSeries(LineSeries, {
+          color: "#f97316", lineWidth: 1, title: "Signal",
+        }, macdPane);
         signalLine.setData(
           indicators["macd_signal"].map((v) => ({ time: toTimestamp(v.timestamp) as any, value: v.value }))
         );
       }
 
-      // ── Vertical trade lines on MACD chart ──
+      // Vertical trade lines on MACD pane
       if (trades.length > 0) {
         const macdKey = indicators["macd_hist"] ? "macd_hist" : indicators["macd"] ? "macd" : null;
         if (macdKey) {
           const macdTimeData = indicators[macdKey].map((v) => toTimestamp(v.timestamp));
           const macdMaxVal = Math.max(...indicators[macdKey].map((v) => Math.abs(v.value)), 1);
 
-          const macdLinesBuy = macdChart.addSeries(HistogramSeries, {
+          const macdLinesBuy = chart.addSeries(HistogramSeries, {
             color: "#06b6d440",
             priceFormat: { type: "volume" },
             priceScaleId: "macd-trade-lines",
             lastValueVisible: false,
-          });
-          macdChart.priceScale("macd-trade-lines").applyOptions({ visible: false });
+          }, macdPane);
+          chart.priceScale("macd-trade-lines", macdPane).applyOptions({ visible: false });
 
           macdLinesBuy.setData(
             macdTimeData.map((time) => ({
@@ -332,12 +323,12 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
             }))
           );
 
-          const macdLinesSell = macdChart.addSeries(HistogramSeries, {
+          const macdLinesSell = chart.addSeries(HistogramSeries, {
             color: "#f9731640",
             priceFormat: { type: "volume" },
             priceScaleId: "macd-trade-lines",
             lastValueVisible: false,
-          });
+          }, macdPane);
           macdLinesSell.setData(
             macdTimeData.map((time) => ({
               time: time as any,
@@ -349,42 +340,17 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
       }
     }
 
-    // ── Time scale sync ─────────────────────────────────────────────────────
-    const subCharts = [rsiChart, macdChart].filter(Boolean) as IChartApi[];
-    if (subCharts.length > 0) {
-      let syncing = false;
-      chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (syncing || !range) return;
-        syncing = true;
-        subCharts.forEach((sc) => sc.timeScale().setVisibleLogicalRange(range));
-        syncing = false;
-      });
-      subCharts.forEach((sc) => {
-        sc.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-          if (syncing || !range) return;
-          syncing = true;
-          chart.timeScale().setVisibleLogicalRange(range);
-          subCharts.forEach((other) => {
-            if (other !== sc) other.timeScale().setVisibleLogicalRange(range);
-          });
-          syncing = false;
-        });
-      });
-    }
+    chart.timeScale().fitContent();
 
     // ── Resize ──────────────────────────────────────────────────────────────
     const handleResize = () => {
       if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth });
-      if (rsiChart && rsiContainerRef.current) rsiChart.applyOptions({ width: rsiContainerRef.current.clientWidth });
-      if (macdChart && macdContainerRef.current) macdChart.applyOptions({ width: macdContainerRef.current.clientWidth });
     };
     window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
       chart.remove();
-      rsiChart?.remove();
-      macdChart?.remove();
     };
   }, [candles, indicators, trades]);
 
@@ -443,34 +409,8 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
         </div>
       )}
 
-      {/* Main price chart */}
+      {/* Single chart with all panes */}
       <div ref={containerRef} />
-
-      {/* RSI sub-panel */}
-      {hasRsi && (
-        <div className="border-t border-gray-800">
-          <div className="px-3 pt-1 pb-0 text-xs text-gray-500 font-medium tracking-wide bg-gray-900/30">
-            RSI &nbsp;
-            <span className="text-gray-600">— 70 overbought · 30 oversold</span>
-          </div>
-          <div ref={rsiContainerRef} />
-        </div>
-      )}
-
-      {/* MACD sub-panel */}
-      {hasMacd && (
-        <div className="border-t border-gray-800">
-          <div className="px-3 pt-1 pb-0 text-xs font-medium tracking-wide bg-gray-900/30">
-            <span className="text-gray-500">MACD &nbsp;</span>
-            <span className="text-blue-400">MACD</span>
-            <span className="text-gray-600"> · </span>
-            <span className="text-orange-400">Signal</span>
-            <span className="text-gray-600"> · </span>
-            <span className="text-gray-500">Histogram</span>
-          </div>
-          <div ref={macdContainerRef} />
-        </div>
-      )}
     </div>
   );
 }
