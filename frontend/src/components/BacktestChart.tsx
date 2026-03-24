@@ -69,6 +69,14 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
     const hasMacdLocal = "macd" in indicators;
     const hasRsiLocal = rsiKeysLocal.length > 0;
 
+    // Collect trade timestamps for vertical lines
+    const buyTimestamps = new Set<number>();
+    const sellTimestamps = new Set<number>();
+    for (const t of trades) {
+      buyTimestamps.add(toTimestamp(t.entry_date));
+      sellTimestamps.add(toTimestamp(t.exit_date));
+    }
+
     // ── Main price chart ────────────────────────────────────────────────────
     const chart = createChart(containerRef.current, {
       ...CHART_THEME,
@@ -147,6 +155,46 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
           text: `$${Math.round(t.exit_price).toLocaleString("en-US")}`,
         })).sort((a, b) => a.time - b.time)
       );
+
+      // ── Vertical trade lines on main chart ──
+      // Buy lines (cyan, dashed)
+      const buyLineSeries = chart.addSeries(HistogramSeries, {
+        color: "#06b6d440",
+        priceFormat: { type: "volume" },
+        priceScaleId: "trade-lines",
+        lastValueVisible: false,
+      });
+      chart.priceScale("trade-lines").applyOptions({ visible: false });
+
+      const candleData = candles.map((c) => ({
+        time: toTimestamp(c.timestamp),
+        high: c.high,
+        low: c.low,
+      }));
+      const maxHigh = Math.max(...candleData.map((c) => c.high));
+
+      buyLineSeries.setData(
+        candleData.map((c) => ({
+          time: c.time as any,
+          value: buyTimestamps.has(c.time) ? maxHigh * 2 : 0,
+          color: buyTimestamps.has(c.time) ? "#06b6d425" : "transparent",
+        }))
+      );
+
+      // Sell lines (orange, dashed)
+      const sellLineSeries = chart.addSeries(HistogramSeries, {
+        color: "#f9731640",
+        priceFormat: { type: "volume" },
+        priceScaleId: "trade-lines",
+        lastValueVisible: false,
+      });
+      sellLineSeries.setData(
+        candleData.map((c) => ({
+          time: c.time as any,
+          value: sellTimestamps.has(c.time) ? maxHigh * 2 : 0,
+          color: sellTimestamps.has(c.time) ? "#f9731625" : "transparent",
+        }))
+      );
     }
 
     chart.timeScale().fitContent();
@@ -182,6 +230,44 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
           price: 30, color: "#22c55e80", lineWidth: 1,
           lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "30",
         });
+      }
+
+      // ── Vertical trade lines on RSI chart ──
+      if (trades.length > 0) {
+        const rsiData = rsiKeysLocal.length > 0
+          ? indicators[rsiKeysLocal[0]].map((v) => toTimestamp(v.timestamp))
+          : [];
+        const rsiTimeSet = new Set(rsiData);
+
+        const rsiLinesBuy = rsiChart.addSeries(HistogramSeries, {
+          color: "#06b6d440",
+          priceFormat: { type: "volume" },
+          priceScaleId: "rsi-trade-lines",
+          lastValueVisible: false,
+        });
+        rsiChart.priceScale("rsi-trade-lines").applyOptions({ visible: false });
+
+        rsiLinesBuy.setData(
+          rsiData.map((time) => ({
+            time: time as any,
+            value: buyTimestamps.has(time) ? 200 : 0,
+            color: buyTimestamps.has(time) ? "#06b6d425" : "transparent",
+          }))
+        );
+
+        const rsiLinesSell = rsiChart.addSeries(HistogramSeries, {
+          color: "#f9731640",
+          priceFormat: { type: "volume" },
+          priceScaleId: "rsi-trade-lines",
+          lastValueVisible: false,
+        });
+        rsiLinesSell.setData(
+          rsiData.map((time) => ({
+            time: time as any,
+            value: sellTimestamps.has(time) ? 200 : 0,
+            color: sellTimestamps.has(time) ? "#f9731625" : "transparent",
+          }))
+        );
       }
     }
 

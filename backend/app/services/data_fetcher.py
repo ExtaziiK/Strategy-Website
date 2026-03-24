@@ -18,19 +18,30 @@ TIMEFRAME_SECONDS = {
 }
 
 
-def fetch_btc_data(timeframe: str = "1h", lookback_days: int = 365) -> pd.DataFrame:
+def fetch_btc_data(timeframe: str = "1h", lookback_days: int = 365,
+                    start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame:
     """Fetch BTC/USDT OHLCV data from Binance via ccxt with full lookback pagination."""
     exchange = ccxt.binance({"enableRateLimit": True})
     tf = TIMEFRAME_MAP.get(timeframe, "1h")
 
-    since_dt = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    if start_date:
+        since_dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+    else:
+        since_dt = datetime.now(timezone.utc) - timedelta(days=lookback_days)
     since_ms = int(since_dt.timestamp() * 1000)
+
+    end_ms = None
+    if end_date:
+        end_dt = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
+        end_ms = int(end_dt.timestamp() * 1000)
 
     all_ohlcv = []
     while True:
         ohlcv = exchange.fetch_ohlcv("BTC/USDT", timeframe=tf, since=since_ms, limit=1000)
         if not ohlcv:
             break
+        if end_ms:
+            ohlcv = [c for c in ohlcv if c[0] <= end_ms]
         all_ohlcv.extend(ohlcv)
         if len(ohlcv) < 1000:
             break
@@ -94,14 +105,16 @@ def cache_to_supabase(supabase_client, df: pd.DataFrame, timeframe: str):
         print(f"Warning: Failed to cache candles to Supabase: {e}", flush=True)
 
 
-def get_btc_data(timeframe: str = "1h", lookback_days: int = 365, supabase_client=None) -> pd.DataFrame:
+def get_btc_data(timeframe: str = "1h", lookback_days: int = 365,
+                  supabase_client=None, start_date: str | None = None,
+                  end_date: str | None = None) -> pd.DataFrame:
     """Get BTC data, trying Supabase cache first, then fetching from Binance."""
-    if supabase_client:
+    if supabase_client and not start_date:
         cached = try_load_from_supabase(supabase_client, timeframe, lookback_days)
         if cached is not None:
             return cached
 
-    df = fetch_btc_data(timeframe, lookback_days)
+    df = fetch_btc_data(timeframe, lookback_days, start_date, end_date)
 
     if supabase_client:
         cache_to_supabase(supabase_client, df, timeframe)

@@ -15,6 +15,8 @@ export interface StrategyConfig {
   exchange: string;
   position_size_pct: number;
   lookback_days: number;
+  start_date: string | null;
+  end_date: string | null;
   trailing_stop_atr: number | null;
   trailing_stop_atr_period: number;
 }
@@ -118,6 +120,8 @@ export function emptyConfig(): StrategyConfig {
     exchange: "binance",
     position_size_pct: 100,
     lookback_days: 365,
+    start_date: null,
+    end_date: null,
     trailing_stop_atr: null,
     trailing_stop_atr_period: 14,
   };

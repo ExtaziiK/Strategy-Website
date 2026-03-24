@@ -36,6 +36,8 @@ def run_backtest_endpoint(request: BacktestRequest):
             timeframe=config.timeframe,
             lookback_days=config.lookback_days,
             supabase_client=supabase_client,
+            start_date=config.start_date,
+            end_date=config.end_date,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch data: {str(e)}")
