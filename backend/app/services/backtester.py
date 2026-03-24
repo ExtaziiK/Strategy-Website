@@ -183,6 +183,17 @@ def evaluate_rules_stateful(row, rules: list, states: list[bool | None]) -> tupl
             new_states.append(states[i])
 
     triggered = bool(results) and all(results)
+
+    # If the combined signal didn't fire, revert crossing states for rules that
+    # DID trigger individually.  This preserves the "a cross happened" info so
+    # the crossing isn't consumed when another rule (e.g. RSI threshold) blocked
+    # the trade on this candle.
+    if not triggered:
+        for i, rule in enumerate(rules):
+            if rule.comparator in ("crosses_above", "crosses_below"):
+                if results[i]:                 # this crossing rule fired …
+                    new_states[i] = states[i]  # … but combined didn't → revert
+
     return triggered, new_states
 
 

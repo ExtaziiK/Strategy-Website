@@ -177,7 +177,7 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
         candleData.map((c) => ({
           time: c.time as any,
           value: buyTimestamps.has(c.time) ? maxHigh * 2 : 0,
-          color: buyTimestamps.has(c.time) ? "#06b6d425" : "transparent",
+          color: buyTimestamps.has(c.time) ? "#06b6d450" : "transparent",
         }))
       );
 
@@ -192,7 +192,7 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
         candleData.map((c) => ({
           time: c.time as any,
           value: sellTimestamps.has(c.time) ? maxHigh * 2 : 0,
-          color: sellTimestamps.has(c.time) ? "#f9731625" : "transparent",
+          color: sellTimestamps.has(c.time) ? "#f9731650" : "transparent",
         }))
       );
     }
@@ -251,7 +251,7 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
           rsiData.map((time) => ({
             time: time as any,
             value: buyTimestamps.has(time) ? 200 : 0,
-            color: buyTimestamps.has(time) ? "#06b6d425" : "transparent",
+            color: buyTimestamps.has(time) ? "#06b6d450" : "transparent",
           }))
         );
 
@@ -265,7 +265,7 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
           rsiData.map((time) => ({
             time: time as any,
             value: sellTimestamps.has(time) ? 200 : 0,
-            color: sellTimestamps.has(time) ? "#f9731625" : "transparent",
+            color: sellTimestamps.has(time) ? "#f9731650" : "transparent",
           }))
         );
       }
@@ -307,6 +307,45 @@ export default function BacktestChart({ candles, indicators, trades }: Props) {
         signalLine.setData(
           indicators["macd_signal"].map((v) => ({ time: toTimestamp(v.timestamp) as any, value: v.value }))
         );
+      }
+
+      // ── Vertical trade lines on MACD chart ──
+      if (trades.length > 0) {
+        const macdKey = indicators["macd_hist"] ? "macd_hist" : indicators["macd"] ? "macd" : null;
+        if (macdKey) {
+          const macdTimeData = indicators[macdKey].map((v) => toTimestamp(v.timestamp));
+          const macdMaxVal = Math.max(...indicators[macdKey].map((v) => Math.abs(v.value)), 1);
+
+          const macdLinesBuy = macdChart.addSeries(HistogramSeries, {
+            color: "#06b6d440",
+            priceFormat: { type: "volume" },
+            priceScaleId: "macd-trade-lines",
+            lastValueVisible: false,
+          });
+          macdChart.priceScale("macd-trade-lines").applyOptions({ visible: false });
+
+          macdLinesBuy.setData(
+            macdTimeData.map((time) => ({
+              time: time as any,
+              value: buyTimestamps.has(time) ? macdMaxVal * 4 : 0,
+              color: buyTimestamps.has(time) ? "#06b6d450" : "transparent",
+            }))
+          );
+
+          const macdLinesSell = macdChart.addSeries(HistogramSeries, {
+            color: "#f9731640",
+            priceFormat: { type: "volume" },
+            priceScaleId: "macd-trade-lines",
+            lastValueVisible: false,
+          });
+          macdLinesSell.setData(
+            macdTimeData.map((time) => ({
+              time: time as any,
+              value: sellTimestamps.has(time) ? macdMaxVal * 4 : 0,
+              color: sellTimestamps.has(time) ? "#f9731650" : "transparent",
+            }))
+          );
+        }
       }
     }
 
