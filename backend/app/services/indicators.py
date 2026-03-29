@@ -1,36 +1,58 @@
 import pandas as pd
-import ta
 
 
 def add_ema(df: pd.DataFrame, period: int) -> pd.DataFrame:
-    """Add EMA column to DataFrame."""
+    """Add EMA column to DataFrame. Uses min_periods=1 so values start from the first candle."""
     col = f"ema_{period}"
-    df[col] = ta.trend.EMAIndicator(close=df["close"], window=period).ema_indicator()
+    df[col] = df["close"].ewm(span=period, min_periods=1, adjust=False).mean()
     return df
 
 
 def add_rsi(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
-    """Add RSI column to DataFrame."""
+    """Add RSI column using Wilder smoothing. SMA seed for the first `period` rows, then EWM."""
     col = f"rsi_{period}"
-    df[col] = ta.momentum.RSIIndicator(close=df["close"], window=period).rsi()
+    delta = df["close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    avg_gain = pd.Series(index=df.index, dtype="float64")
+    avg_loss = pd.Series(index=df.index, dtype="float64")
+
+    # SMA seed
+    avg_gain.iloc[period] = gain.iloc[1:period + 1].mean()
+    avg_loss.iloc[period] = loss.iloc[1:period + 1].mean()
+
+    # Wilder EWM from period+1 onward
+    alpha = 1 / period
+    for i in range(period + 1, len(df)):
+        avg_gain.iloc[i] = avg_gain.iloc[i - 1] * (1 - alpha) + gain.iloc[i] * alpha
+        avg_loss.iloc[i] = avg_loss.iloc[i - 1] * (1 - alpha) + loss.iloc[i] * alpha
+
+    rs = avg_gain / avg_loss
+    df[col] = 100 - (100 / (1 + rs))
+    # Fill the first `period` rows with 50 (neutral) so the indicator covers the full range
+    df[col] = df[col].fillna(50)
     return df
 
 
 def add_atr(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
-    """Add ATR column to DataFrame."""
+    """Add ATR column to DataFrame. Uses min_periods=1 for full coverage."""
     col = f"atr_{period}"
-    df[col] = ta.volatility.AverageTrueRange(
-        high=df["high"], low=df["low"], close=df["close"], window=period
-    ).average_true_range()
+    high_low = df["high"] - df["low"]
+    high_close = (df["high"] - df["close"].shift()).abs()
+    low_close = (df["low"] - df["close"].shift()).abs()
+    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+    df[col] = tr.ewm(span=period, min_periods=1, adjust=False).mean()
     return df
 
 
 def add_macd(df: pd.DataFrame) -> pd.DataFrame:
-    """Add MACD, MACD signal, and MACD histogram columns."""
-    macd_indicator = ta.trend.MACD(close=df["close"])
-    df["macd"] = macd_indicator.macd()
-    df["macd_signal"] = macd_indicator.macd_signal()
-    df["macd_hist"] = macd_indicator.macd_diff()
+    """Add MACD, MACD signal, and MACD histogram columns. Uses min_periods=1 for full coverage."""
+    ema12 = df["close"].ewm(span=12, min_periods=1, adjust=False).mean()
+    ema26 = df["close"].ewm(span=26, min_periods=1, adjust=False).mean()
+    df["macd"] = ema12 - ema26
+    df["macd_signal"] = df["macd"].ewm(span=9, min_periods=1, adjust=False).mean()
+    df["macd_hist"] = df["macd"] - df["macd_signal"]
     return df
 
 

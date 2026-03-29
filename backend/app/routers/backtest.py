@@ -1,34 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from app.models import BacktestRequest, BacktestResultResponse, StrategyConfig, CandleData
 from app.database import get_supabase
-from app.services.data_fetcher import get_btc_data, TIMEFRAME_SECONDS
+from app.services.data_fetcher import get_btc_data
 from app.services.indicators import compute_indicators
 from app.services.backtester import run_backtest
 import uuid
-import pandas as pd
-from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
-
-
-def _max_warmup_periods(rules: list) -> int:
-    """Return the largest indicator period across all rules (indicator + value refs)."""
-    max_p = 0
-    for rule in rules:
-        ind = rule.indicator.lower()
-        if ind in ("ema", "rsi", "atr"):
-            max_p = max(max_p, int(rule.params.get("period", 20 if ind == "ema" else 14)))
-        elif ind in ("macd", "macd_signal", "macd_hist"):
-            max_p = max(max_p, 34)  # MACD uses 26-period EMA + 9-period signal
-        if isinstance(rule.value, str):
-            val = rule.value.lower()
-            if val.startswith("ema_"):
-                max_p = max(max_p, int(val.split("_")[1]))
-            elif val.startswith("rsi_"):
-                max_p = max(max_p, int(val.split("_")[1]))
-            elif val.startswith("atr_"):
-                max_p = max(max_p, int(val.split("_")[1]))
-    return max_p
 
 
 @router.post("/")
@@ -47,27 +25,7 @@ def run_backtest_endpoint(request: BacktestRequest):
     if config is None:
         raise HTTPException(status_code=400, detail="Provide strategy_id or config")
 
-    # Calculate warmup: fetch extra candles so indicators cover the full range
-    all_rules = config.buy_rules + config.sell_rules + config.filters
-    warmup_periods = _max_warmup_periods(all_rules)
-    if config.trailing_stop_atr:
-        warmup_periods = max(warmup_periods, config.trailing_stop_atr_period)
-    # Add 50% buffer for EMA convergence
-    warmup_candles = int(warmup_periods * 1.5) + 10
-
-    tf_seconds = TIMEFRAME_SECONDS.get(config.timeframe, 3600)
-    warmup_seconds = warmup_candles * tf_seconds
-
-    # Shift start date / lookback back by warmup amount
-    warmup_days = int(warmup_seconds / 86400) + 1
-    fetch_start = config.start_date
-    fetch_lookback = config.lookback_days + warmup_days
-    if config.start_date:
-        orig_start_dt = datetime.fromisoformat(config.start_date).replace(tzinfo=timezone.utc)
-        warmup_start_dt = orig_start_dt - timedelta(seconds=warmup_seconds)
-        fetch_start = warmup_start_dt.isoformat()
-
-    # Fetch data (with warmup prefix)
+    # Fetch data
     try:
         supabase_client = None
         try:
@@ -76,15 +34,16 @@ def run_backtest_endpoint(request: BacktestRequest):
             pass
         df = get_btc_data(
             timeframe=config.timeframe,
-            lookback_days=fetch_lookback,
+            lookback_days=config.lookback_days,
             supabase_client=supabase_client,
-            start_date=fetch_start,
+            start_date=config.start_date,
             end_date=config.end_date,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch data: {str(e)}")
 
-    # Compute indicators on full dataset (including warmup)
+    # Compute indicators (min_periods=1, so values start from the first candle)
+    all_rules = config.buy_rules + config.sell_rules + config.filters
     df = compute_indicators(df, all_rules)
 
     # Ensure ATR is computed when trailing stop is enabled
@@ -94,17 +53,8 @@ def run_backtest_endpoint(request: BacktestRequest):
             from app.services.indicators import add_atr
             df = add_atr(df, config.trailing_stop_atr_period)
 
-    # Run backtest on the full dataset (warmup rows let indicators be valid from the start)
+    # Run backtest
     result = run_backtest(df, config)
-
-    # Trim to user's requested range for chart output
-    if config.start_date:
-        orig_start_dt = datetime.fromisoformat(config.start_date).replace(tzinfo=timezone.utc)
-        df = df[df["timestamp"] >= pd.Timestamp(orig_start_dt)].reset_index(drop=True)
-    elif warmup_days > 0:
-        # lookback_days case: trim the extra warmup candles
-        desired_start = datetime.now(timezone.utc) - timedelta(days=config.lookback_days)
-        df = df[df["timestamp"] >= pd.Timestamp(desired_start)].reset_index(drop=True)
 
     # Attach strategy_id if available
     if request.strategy_id:
