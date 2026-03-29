@@ -6,11 +6,11 @@ from app.config import settings
 app = FastAPI(title="BTC Backtester API")
 
 _origins = {o.strip() for o in settings.allowed_origins.split(",") if o.strip()}
-_origins.add("https://strategy-website.vercel.app")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(_origins),
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
