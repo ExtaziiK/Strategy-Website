@@ -87,7 +87,8 @@ export interface BacktestResponse {
 
 export const INDICATORS = ["price", "ema", "rsi", "atr", "macd", "macd_signal", "macd_hist"] as const;
 export const COMPARATORS = [">", "<", "crosses_above", "crosses_below"] as const;
-export const TIMEFRAMES = ["1h", "4h", "1d", "1w"] as const;
+export const TIMEFRAME_UNITS = ["h", "d", "w"] as const;
+export const TIMEFRAME_UNIT_LABELS: Record<string, string> = { h: "Hour", d: "Day", w: "Week" };
 export const EXCHANGES = [
   { value: "binance",     label: "Binance (0.10%)" },
   { value: "kraken",      label: "Kraken (0.26%)" },

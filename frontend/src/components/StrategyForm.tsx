@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
-import { StrategyConfig, StrategyRule, TIMEFRAMES, EXCHANGES, LOOKBACK_OPTIONS, emptyRule, emptyConfig } from "@/lib/types";
+import { StrategyConfig, StrategyRule, TIMEFRAME_UNITS, TIMEFRAME_UNIT_LABELS, EXCHANGES, LOOKBACK_OPTIONS, emptyRule, emptyConfig } from "@/lib/types";
 import RuleRow from "./RuleRow";
 
 interface Props {
@@ -142,15 +142,31 @@ export default function StrategyForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-300 mb-1">Timeframe</label>
-          <select
-            value={config.timeframe}
-            onChange={(e) => setConfig({ ...config, timeframe: e.target.value })}
-            className="w-full rounded bg-gray-800 border border-gray-700 px-3 py-1.5 text-sm text-white"
-          >
-            {TIMEFRAMES.map((tf) => (
-              <option key={tf} value={tf}>{tf.toUpperCase()}</option>
-            ))}
-          </select>
+          <div className="flex gap-1.5">
+            <input
+              type="number"
+              value={parseInt(config.timeframe) || 1}
+              onChange={(e) => {
+                const n = Math.max(1, Number(e.target.value));
+                const unit = config.timeframe.replace(/[0-9]/g, "") || "h";
+                setConfig({ ...config, timeframe: `${n}${unit}` });
+              }}
+              className="w-16 rounded bg-gray-800 border border-gray-700 px-3 py-1.5 text-sm text-white"
+              min={1}
+            />
+            <select
+              value={config.timeframe.replace(/[0-9]/g, "") || "h"}
+              onChange={(e) => {
+                const n = parseInt(config.timeframe) || 1;
+                setConfig({ ...config, timeframe: `${n}${e.target.value}` });
+              }}
+              className="flex-1 rounded bg-gray-800 border border-gray-700 px-3 py-1.5 text-sm text-white"
+            >
+              {TIMEFRAME_UNITS.map((u) => (
+                <option key={u} value={u}>{TIMEFRAME_UNIT_LABELS[u]}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-300 mb-1">Balance (USDT)</label>
